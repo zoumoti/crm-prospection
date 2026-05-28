@@ -2,7 +2,7 @@
 // POST endpoint that receives Telegram bot updates.
 // Auth: X-Telegram-Bot-Api-Secret-Token header must match TELEGRAM_WEBHOOK_SECRET.
 // Routing: /start (anywhere), then chat-allowlist via prospection_settings.telegram_chat_id,
-// then /help, reply-to-bot (niche-then-create), URL (intake question).
+// then /help, then URL intake (creates the contact immediately).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { env } from './_lib/env.js'
@@ -10,7 +10,7 @@ import { supabaseAdmin } from './_lib/supabase-admin.js'
 import { sendMessage, escapeHtml } from './_lib/telegram.js'
 import { parseProspectUrl } from './_lib/url-parser.js'
 import { STAGE_LABELS } from './_lib/stage-labels.js'
-import type { TelegramUpdate, TelegramMessage, ContactStage } from './_lib/types.js'
+import type { TelegramUpdate, ContactStage } from './_lib/types.js'
 
 type UserRow = { user_id: string }
 
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  // 2. Parse update (Vercel auto-parses JSON body when Content-Type matches)
+  // 2. Parse update
   const update = req.body as TelegramUpdate | undefined
   const message = update?.message
   if (!message?.text) {
@@ -59,11 +59,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  // 5. Commands & reply-aware routing
+  // 5. Commands
   if (text === '/help') return handleHelp(chatId, res)
-  if (message.reply_to_message) return handleNicheReply(chatId, message, user, res)
 
-  // 6. Default: treat as URL intake (ask niche, create on reply)
+  // 6. Default: treat as URL intake (create immediately)
   return handleIntake(chatId, text, user, res)
 }
 
@@ -73,33 +72,31 @@ async function handleStart(chatId: string, res: VercelResponse): Promise<void> {
   await sendMessage(chatId,
     `👋 <b>Salut !</b>\n\n` +
     `Ton <code>chat_id</code> : <code>${chatId}</code>\n\n` +
-    `Colle-le dans <b>Paramètres → Prospection → Telegram</b> pour activer l'intake et le récap quotidien.\n\n` +
-    `<i>Une fois configuré, envoie-moi une URL LinkedIn, Instagram, TikTok ou X pour ajouter un prospect.</i>`,
+    `Colle-le dans <b>Paramètres → Prospection → Telegram</b> pour activer l'ajout de prospects.\n\n` +
+    `<i>Une fois configuré, envoie-moi une URL LinkedIn, Instagram, TikTok ou X : je l'ajoute direct au CRM.</i>`,
   )
   res.status(200).send('ok')
 }
 
 async function handleHelp(chatId: string, res: VercelResponse): Promise<void> {
   await sendMessage(chatId,
-    `<b>📘 Aide Business OS</b>\n\n` +
+    `<b>📘 Aide</b>\n\n` +
     `<b>Commandes</b>\n` +
     `• <code>/start</code> — récupérer ton chat_id\n` +
     `• <code>/help</code> — afficher cette aide\n\n` +
     `<b>Ajouter un prospect</b>\n` +
-    `Envoie l'URL d'un profil :\n` +
+    `Envoie l'URL d'un profil, je l'ajoute direct au CRM :\n` +
     `• LinkedIn — <code>linkedin.com/in/…</code>\n` +
     `• Instagram — <code>instagram.com/…</code>\n` +
     `• TikTok — <code>tiktok.com/@…</code>\n` +
-    `• X / Twitter — <code>x.com/…</code>\n\n` +
-    `<i>Le bot te demandera la niche, et créera le contact une fois ta réponse reçue.</i>`,
+    `• X / Twitter — <code>x.com/…</code>`,
   )
   res.status(200).send('ok')
 }
 
-// ---------- intake: ask niche only, do NOT create contact yet ----------
+// ---------- intake: create the contact immediately ----------
 
 async function handleIntake(chatId: string, url: string, user: UserRow, res: VercelResponse): Promise<void> {
-  // 1. Parse URL
   const parsed = parseProspectUrl(url)
   if (!parsed) {
     await sendMessage(chatId,
@@ -114,7 +111,6 @@ async function handleIntake(chatId: string, url: string, user: UserRow, res: Ver
     return
   }
 
-  // 2. Check duplicate (active uniquement, archivés ignorés volontairement)
   const dup = await findActiveDuplicate(user.user_id, url)
   if (dup) {
     await replyDuplicate(chatId, dup)
@@ -122,78 +118,14 @@ async function handleIntake(chatId: string, url: string, user: UserRow, res: Ver
     return
   }
 
-  // 3. Ask niche via force_reply. The profile URL is embedded as a text_link
-  // — we extract it back on reply to re-parse and create the contact with the
-  // niche already set. No DB write yet.
-  const name = `${parsed.firstName} ${parsed.lastName}`.trim()
-  const platformLabel = PLATFORM_LABELS[parsed.source] ?? parsed.source
-  await sendMessage(chatId,
-    `✨ <b>${escapeHtml(name)}</b>\n` +
-    `<i>${platformLabel}</i>  ·  🔗 <a href="${url}">Voir le profil</a>\n\n` +
-    `✍️ <b>Quelle niche ?</b>\n` +
-    `<i>Réponds à ce message avec la niche pour créer le contact.</i>`,
-    { reply_markup: { force_reply: true, selective: true } },
-  )
-
-  res.status(200).send('ok')
-}
-
-// ---------- niche reply: now create the contact with niche set ----------
-
-async function handleNicheReply(chatId: string, msg: TelegramMessage, user: UserRow, res: VercelResponse): Promise<void> {
-  const replyTo = msg.reply_to_message
-  if (!replyTo) {
-    res.status(200).send('ok')
-    return
-  }
-
-  // Recover the original profile URL from the bot's previous message.
-  const profileUrl = extractProfileUrlFromEntities(replyTo)
-  if (!profileUrl) {
-    await sendMessage(chatId, `❌ <i>Impossible de retrouver le profil. Renvoie l'URL pour recommencer.</i>`)
-    res.status(200).send('ok')
-    return
-  }
-
-  // Reject empty or /skip — niche is mandatory in this workflow.
-  const rawNiche = (msg.text ?? '').trim()
-  if (!rawNiche || rawNiche.toLowerCase() === '/skip') {
-    await sendMessage(chatId,
-      `✋ <b>Niche obligatoire</b>\n` +
-      `<i>Réponds à ma question précédente avec la niche du prospect (ex. « Coachs sportifs »).</i>`,
-    )
-    res.status(200).send('ok')
-    return
-  }
-  const niche = rawNiche.slice(0, 120)
-
-  // Re-parse the URL — we trust the URL pulled from our own previous message,
-  // but a fresh parse keeps the logic centralized.
-  const parsed = parseProspectUrl(profileUrl)
-  if (!parsed) {
-    await sendMessage(chatId, `❌ <i>L'URL du profil n'est plus reconnaissable. Renvoie-la pour recommencer.</i>`)
-    res.status(200).send('ok')
-    return
-  }
-
-  // Re-check duplicate (in case it was created via the app between the question and the reply).
-  const dup = await findActiveDuplicate(user.user_id, profileUrl)
-  if (dup) {
-    await replyDuplicate(chatId, dup)
-    res.status(200).send('ok')
-    return
-  }
-
-  // Create the contact with the niche already set.
   const { data: created, error } = await supabaseAdmin()
     .from('contacts')
     .insert({
-      user_id: user.user_id,
+      user_id:    user.user_id,
       first_name: parsed.firstName,
       last_name:  parsed.lastName,
       source:     parsed.source,
-      source_url: profileUrl,
-      niche,
+      source_url: url,
       stage:      'to_contact',
     })
     .select('id, first_name, last_name')
@@ -211,7 +143,7 @@ async function handleNicheReply(chatId: string, msg: TelegramMessage, user: User
   const platformLabel = PLATFORM_LABELS[parsed.source] ?? parsed.source
   await sendMessage(chatId,
     `✅ <b>${escapeHtml(name)}</b> ajouté\n` +
-    `<i>${platformLabel} · niche : ${escapeHtml(niche)}</i>\n\n` +
+    `<i>${platformLabel}</i>\n\n` +
     `🔗 <a href="${fiche}">Voir la fiche</a>`,
   )
   res.status(200).send('ok')
@@ -219,10 +151,6 @@ async function handleNicheReply(chatId: string, msg: TelegramMessage, user: User
 
 // ---------- helpers ----------
 
-/**
- * Find an existing active contact for this user with the same source_url.
- * Returns null if none found, or the existing row if a duplicate exists.
- */
 async function findActiveDuplicate(userId: string, url: string) {
   const { data } = await supabaseAdmin()
     .from('contacts')
@@ -244,21 +172,6 @@ async function replyDuplicate(chatId: string, existing: { id: string; stage: Con
     `<i>${escapeHtml(stageLabel)} · ${ageLabel}</i>\n\n` +
     `→ <a href="${link}">Voir la fiche</a>`,
   )
-}
-
-/**
- * Pull the first profile URL we recognise out of the previous bot message's
- * entities. We embed the profile URL via a `<a>` tag in the question message
- * (becomes a `text_link` entity in Telegram's wire format), so we can recover
- * it on reply without storing pending state in the DB.
- */
-function extractProfileUrlFromEntities(msg: TelegramMessage): string | null {
-  if (!msg.entities) return null
-  for (const e of msg.entities) {
-    if (e.type !== 'text_link' || !e.url) continue
-    if (parseProspectUrl(e.url)) return e.url
-  }
-  return null
 }
 
 async function findUserByTelegramChatId(chatId: string): Promise<UserRow | null> {
