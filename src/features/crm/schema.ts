@@ -109,8 +109,6 @@ export const prospectionSettingsSchema = z.object({
     )
     .transform((v) => (v === '' ? null : v))
     .nullable(),
-  daily_recap_enabled: z.coerce.boolean(),
-  daily_recap_hour:    z.coerce.number().int().min(0).max(23),
 })
 export type ProspectionSettingsFormValues = z.input<typeof prospectionSettingsSchema>
 export type ProspectionSettingsFormOutput = z.output<typeof prospectionSettingsSchema>
@@ -123,6 +121,4 @@ export const emptyProspectionSettingsForm: ProspectionSettingsFormValues = {
   conversation_followup_days: 2,
   max_followups: 3,
   telegram_chat_id: '',
-  daily_recap_enabled: true,
-  daily_recap_hour: 7,
 }

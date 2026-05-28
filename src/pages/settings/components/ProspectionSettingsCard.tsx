@@ -26,8 +26,6 @@ function toFormValues(s: ProspectionSettings | null | undefined): ProspectionSet
     conversation_followup_days: s.conversation_followup_days,
     max_followups: s.max_followups,
     telegram_chat_id: s.telegram_chat_id ?? '',
-    daily_recap_enabled: s.daily_recap_enabled,
-    daily_recap_hour: s.daily_recap_hour,
   }
 }
 
@@ -124,7 +122,7 @@ export function ProspectionSettingsCard() {
 
         <Section title="Telegram">
           <p className="text-xs text-muted -mt-1 mb-1">
-            Pour activer l'intake mobile et le récap quotidien : ouvre Telegram,
+            Pour ajouter des prospects depuis ton téléphone : ouvre Telegram,
             envoie <code>/start</code> à ton bot, et colle ici le <code>chat_id</code> qu'il te renvoie.
           </p>
           <FieldWrapper label="Chat ID Telegram" error={errors.telegram_chat_id?.message}>
@@ -135,28 +133,6 @@ export function ProspectionSettingsCard() {
               {...register('telegram_chat_id')}
             />
           </FieldWrapper>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldWrapper label="Heure du récap (Europe/Paris)" error={errors.daily_recap_hour?.message}>
-              <select
-                className="w-full min-h-[44px] rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-                {...register('daily_recap_hour', { valueAsNumber: true })}
-              >
-                {Array.from({ length: 24 }, (_, h) => (
-                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-                ))}
-              </select>
-            </FieldWrapper>
-            <FieldWrapper label="Récap quotidien">
-              <label className="flex items-center gap-2 min-h-[44px]">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border accent-accent"
-                  {...register('daily_recap_enabled')}
-                />
-                <span className="text-sm">Recevoir chaque matin</span>
-              </label>
-            </FieldWrapper>
-          </div>
         </Section>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
