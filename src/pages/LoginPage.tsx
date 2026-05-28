@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/Label'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { Logo } from '@/components/ui/Logo'
+import { APP_NAME } from '@/config/brand'
 
 export function LoginPage() {
   const { session, signIn, loading, initialized } = useAuth()
@@ -48,7 +49,7 @@ export function LoginPage() {
       <Card className="w-full max-w-md">
         <div className="flex items-center gap-2 mb-6">
           <Logo size={36} />
-          <span className="font-semibold text-text text-lg">Business OS</span>
+          <span className="font-semibold text-text text-lg">{APP_NAME}</span>
         </div>
 
         <h1 className="text-2xl font-semibold text-text mb-1">Se connecter</h1>

@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/ui/Logo'
+import { APP_NAME } from '@/config/brand'
 import { navGroups } from './nav-items'
 
 interface SidebarProps {
@@ -83,7 +84,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
       <aside className="hidden md:flex md:flex-col fixed inset-y-0 left-0 w-[220px] bg-surface border-r border-border z-30">
         <div className="h-16 flex items-center gap-2 px-5 border-b border-border">
           <Logo size={32} />
-          <span className="font-semibold text-text">Business OS</span>
+          <span className="font-semibold text-text">{APP_NAME}</span>
         </div>
         <NavContent />
       </aside>
@@ -113,7 +114,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           <div className="h-16 flex items-center justify-between gap-2 px-5 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <Logo size={32} />
-              <span className="font-semibold text-text">Business OS</span>
+              <span className="font-semibold text-text">{APP_NAME}</span>
             </div>
             <button
               type="button"

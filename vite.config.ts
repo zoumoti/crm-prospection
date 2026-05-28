@@ -15,8 +15,8 @@ export default defineConfig({
       // Manifest + SW are still generated in `npm run build` / `npm run preview`.
       devOptions: { enabled: false },
       manifest: {
-        name: 'Business OS',
-        short_name: 'BusinessOS',
+        name: 'CRM Prospection',
+        short_name: 'CRM Prospection',
         description: "Gestion d'entreprise pour opérateur solo",
         lang: 'fr',
         theme_color: '#10B981',
