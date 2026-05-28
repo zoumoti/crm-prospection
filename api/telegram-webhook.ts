@@ -139,12 +139,10 @@ async function handleIntake(chatId: string, url: string, user: UserRow, res: Ver
   }
 
   const name = `${created.first_name} ${created.last_name}`.trim()
-  const fiche = `${env.PUBLIC_APP_URL}/crm/contacts/${created.id}`
   const platformLabel = PLATFORM_LABELS[parsed.source] ?? parsed.source
   await sendMessage(chatId,
     `✅ <b>${escapeHtml(name)}</b> ajouté\n` +
-    `<i>${platformLabel}</i>\n\n` +
-    `🔗 <a href="${fiche}">Voir la fiche</a>`,
+    `<i>${platformLabel}</i>`,
   )
   res.status(200).send('ok')
 }
