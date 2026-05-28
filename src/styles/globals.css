@@ -1,0 +1,67 @@
+@import "@fontsource-variable/inter";
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #F4F6F8;
+  --color-surface: #FFFFFF;
+  --color-accent: #10B981;
+  --color-accent-soft: rgba(16, 185, 129, 0.08);
+  --color-accent-hover: #059669;
+  --color-text: #0F172A;
+  --color-muted: #64748B;
+  --color-border: #E2E8F0;
+  --color-danger: #EF4444;
+  --color-warning: #F59E0B;
+  --color-success: #10B981;
+  --color-success-soft:  rgba(16, 185, 129, 0.10);
+  --color-danger-soft:   rgba(239, 68, 68, 0.10);
+  --color-info:          #3B82F6;
+  --color-info-soft:     rgba(59, 130, 246, 0.10);
+  --color-purple:        #8B5CF6;
+  --color-purple-soft:   rgba(139, 92, 246, 0.10);
+  --color-pink:          #EC4899;
+  --color-pink-soft:     rgba(236, 72, 153, 0.10);
+  --color-warning-soft:  rgba(245, 158, 11, 0.12);
+  --color-muted-soft:    rgba(100, 116, 139, 0.10);
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  html.dark {
+    --color-bg: #0F172A;
+    --color-surface: #1E293B;
+    --color-text: #F8FAFC;
+    --color-muted: #94A3B8;
+    --color-border: #334155;
+    --color-accent-soft: rgba(16, 185, 129, 0.14);
+    --color-success-soft: rgba(16, 185, 129, 0.14);
+    --color-danger-soft:  rgba(239, 68, 68, 0.14);
+    --color-info-soft:    rgba(59, 130, 246, 0.18);
+    --color-purple-soft:  rgba(139, 92, 246, 0.18);
+    --color-pink-soft:    rgba(236, 72, 153, 0.18);
+    --color-warning-soft: rgba(245, 158, 11, 0.22);
+    --color-muted-soft:   rgba(148, 163, 184, 0.16);
+  }
+
+  html, body, #root {
+    height: 100%;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+}
