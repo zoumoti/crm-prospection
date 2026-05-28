@@ -1,11 +1,22 @@
 -- =====================================================================
--- 0011_crm.sql
--- CRM Prospection module — Phase 1 web-only.
+-- 0001_init.sql — CRM Prospection (schéma complet, à coller dans le
+-- SQL editor Supabase puis exécuter une fois).
 -- Tables: contacts (prospects), followups (relances), interactions
--- (timeline append-only), prospection_settings (1 row per user).
--- RPC: change_contact_stage, complete_followup — atomic plpgsql
--- functions that orchestrate stage transitions and followup completion.
+-- (timeline append-only), prospection_settings (1 ligne / user).
+-- RPC: change_contact_stage, complete_followup.
+-- RLS user-scoped sur toutes les tables.
 -- =====================================================================
+
+-- ============= updated_at trigger helper =============
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
 
 -- ============= Enums =============
 create type contact_stage as enum (
@@ -58,7 +69,6 @@ create index contacts_user_created_idx
   on contacts (user_id, created_at desc)
   where archived_at is null;
 
--- Reuse the set_updated_at() function defined in 0001_clients.sql
 create trigger trg_contacts_updated_at
   before update on contacts
   for each row execute function set_updated_at();
@@ -103,12 +113,17 @@ create table prospection_settings (
   followup_2_days              int  not null default 7,
   conversation_followup_days   int  not null default 2,
   max_followups                int  not null default 3,
+  telegram_chat_id             text,
   updated_at                   timestamptz not null default now(),
 
   constraint prospection_settings_positive_delays
     check (followup_1_days > 0 and followup_2_days > 0
            and conversation_followup_days > 0 and max_followups > 0)
 );
+
+create unique index prospection_settings_telegram_chat_id_uniq
+  on prospection_settings (telegram_chat_id)
+  where telegram_chat_id is not null;
 
 create trigger trg_prospection_settings_updated_at
   before update on prospection_settings
@@ -313,6 +328,7 @@ begin
                                'followup_index', v_index,
                                'note', p_note));
 
+  -- prospect_followup chain
   if v_type = 'prospect_followup' and v_contact_stage = 'message_sent' then
     select * into v_settings from prospection_settings where user_id = v_user_id;
     if not found then
@@ -320,17 +336,7 @@ begin
       v_settings.max_followups   := 3;
     end if;
 
-    if v_index >= v_settings.max_followups then
-      update contacts set stage = 'closed_lost', updated_at = now() where id = v_contact_id;
-      insert into interactions (contact_id, type, payload)
-        values (v_contact_id, 'stage_change',
-                jsonb_build_object('old_stage', 'message_sent',
-                                   'new_stage', 'closed_lost',
-                                   'reason', 'auto_closed_lost'));
-      insert into interactions (contact_id, type, payload)
-        values (v_contact_id, 'auto_closed_lost',
-                jsonb_build_object('after_followup_index', v_index));
-    else
+    if v_index < v_settings.max_followups then
       v_next_at :=
         ((now() at time zone 'Europe/Paris')::date
          + v_settings.followup_2_days * interval '1 day'
@@ -345,6 +351,27 @@ begin
                                    'followup_index', v_index + 1,
                                    'scheduled_at', v_next_at));
     end if;
+  end if;
+
+  -- conversation_followup chain (recurring while in 'replied')
+  if v_type = 'conversation_followup' and v_contact_stage = 'replied' then
+    select * into v_settings from prospection_settings where user_id = v_user_id;
+    if not found then
+      v_settings.conversation_followup_days := 2;
+    end if;
+
+    v_next_at :=
+      ((now() at time zone 'Europe/Paris')::date
+       + v_settings.conversation_followup_days * interval '1 day'
+       + interval '9 hours') at time zone 'Europe/Paris';
+    insert into followups (contact_id, type, scheduled_at)
+      values (v_contact_id, 'conversation_followup', v_next_at)
+      returning id into v_new_followup_id;
+    insert into interactions (contact_id, type, payload)
+      values (v_contact_id, 'followup_created',
+              jsonb_build_object('followup_id', v_new_followup_id,
+                                 'followup_type', 'conversation_followup',
+                                 'scheduled_at', v_next_at));
   end if;
 end;
 $$;
