@@ -12,8 +12,7 @@ function required(name: string): string {
 export const env = {
   get TELEGRAM_BOT_TOKEN()        { return required('TELEGRAM_BOT_TOKEN') },
   get TELEGRAM_WEBHOOK_SECRET()   { return required('TELEGRAM_WEBHOOK_SECRET') },
-  get CRON_SECRET()               { return required('CRON_SECRET') },
-  get SUPABASE_URL()              { return required('SUPABASE_URL') },
+get SUPABASE_URL()              { return required('SUPABASE_URL') },
   get SUPABASE_SERVICE_ROLE_KEY() { return required('SUPABASE_SERVICE_ROLE_KEY') },
   get PUBLIC_APP_URL()            { return required('PUBLIC_APP_URL') },
 }
