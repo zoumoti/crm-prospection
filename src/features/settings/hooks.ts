@@ -64,7 +64,6 @@ export function useCanCreateInvoice() {
   if (isLoading) {
     return { canCreate: false, missingFields: REQUIRED_FOR_INVOICE as string[], isLoading: true }
   }
-  // settings can legitimately be null (fresh user, no row yet) — treat as "all fields missing"
   const missingFields = REQUIRED_FOR_INVOICE.filter((k) => !settings?.[k])
   return { canCreate: missingFields.length === 0, missingFields: missingFields as string[], isLoading: false }
 }
