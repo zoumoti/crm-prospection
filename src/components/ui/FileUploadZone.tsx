@@ -1,7 +1,12 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from 'react'
 import { Upload, FileText, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatFileSize } from '@/features/contracts/format'
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
+}
 
 interface FileUploadZoneProps {
   value: File | null
