@@ -75,20 +75,38 @@ async function handleStart(chatId: string, payload: string, res: VercelResponse)
   // Deep-link linking: the app opened t.me/<bot>?start=<code>. Bind this chat
   // to the account that generated <code>, then consume the code (one-time).
   if (payload) {
-    const { data, error } = await supabaseAdmin()
+    // 1. Find the account that generated this code.
+    const { data: target } = await supabaseAdmin()
       .from('prospection_settings')
-      .update({ telegram_chat_id: chatId, telegram_link_code: null })
-      .eq('telegram_link_code', payload)
       .select('user_id')
+      .eq('telegram_link_code', payload)
       .maybeSingle()
-    if (!error && data) {
-      await sendMessage(chatId,
-        `✅ <b>Telegram connecté !</b>\n\n` +
-        `<i>C'est bon, reviens dans l'app. Envoie-moi une URL LinkedIn, Instagram, TikTok ou X quand tu veux : je l'ajoute direct à ton CRM.</i>`,
-      )
-      res.status(200).send('ok')
-      return
+
+    if (target) {
+      // 2. Release this Telegram chat from any OTHER account first
+      //    (telegram_chat_id is unique) so re-linking / switching account works.
+      await supabaseAdmin()
+        .from('prospection_settings')
+        .update({ telegram_chat_id: null })
+        .eq('telegram_chat_id', chatId)
+        .neq('user_id', target.user_id)
+
+      // 3. Bind the chat to the target account and consume the code.
+      const { error } = await supabaseAdmin()
+        .from('prospection_settings')
+        .update({ telegram_chat_id: chatId, telegram_link_code: null })
+        .eq('user_id', target.user_id)
+
+      if (!error) {
+        await sendMessage(chatId,
+          `✅ <b>Telegram connecté !</b>\n\n` +
+          `<i>C'est bon, reviens dans l'app. Envoie-moi une URL LinkedIn, Instagram, TikTok ou X quand tu veux : je l'ajoute direct à ton CRM.</i>`,
+        )
+        res.status(200).send('ok')
+        return
+      }
     }
+
     await sendMessage(chatId,
       `❌ <b>Lien invalide ou expiré</b>\n\n` +
       `<i>Retourne dans l'app → Paramètres → clique « Connecter Telegram » pour générer un nouveau lien.</i>`,
