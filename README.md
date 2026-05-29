@@ -27,6 +27,7 @@ Plus un **dashboard** qui te montre ton entonnoir de conversion (« combien de m
 - [Vérifier que tout marche](#vérifier-que-tout-marche)
 - [Comment utiliser l'app au quotidien](#comment-utiliser-lapp-au-quotidien)
 - [Ce que tu peux régler](#ce-que-tu-peux-régler)
+- [Mode partagé (plusieurs personnes sur une instance)](#mode-partagé-plusieurs-personnes-sur-une-instance)
 - [En cas de problème (dépannage)](#en-cas-de-problème-dépannage)
 
 ---
@@ -94,6 +95,8 @@ L'app a une page de login. On crée ton utilisateur directement dans Supabase (p
 2. Mets ton **email** + un **mot de passe**, et **coche « Auto Confirm User »** (sinon tu ne pourras pas te connecter).
 3. **Create user.** C'est ce couple email/mot de passe que tu utiliseras pour entrer dans l'app.
 
+> Pour une instance **partagée** où chacun crée son compte lui-même, tu peux sauter cette étape et activer plutôt l'inscription : voir [Mode partagé](#mode-partagé-plusieurs-personnes-sur-une-instance).
+
 ### Étape 4 — Créer le bot Telegram
 
 1. Sur Telegram, cherche **@BotFather** (le bot officiel) et ouvre une conversation.
@@ -105,19 +108,22 @@ L'app a une page de login. On crée ton utilisateur directement dans Supabase (p
 
 1. Sur [Vercel](https://vercel.com) → **Add New…** → **Project**.
 2. Importe **ton** repo GitHub (celui de l'étape 1). Si Vercel ne le voit pas, autorise-le à accéder à ton GitHub.
-3. **Avant de cliquer Deploy**, ouvre la section **Environment Variables** et ajoute les variables ci-dessous. Le fichier **`.env.example`** dans le code liste exactement ces variables avec, pour chacune, **où trouver la valeur**. Tu en mets 7 :
+3. **Avant de cliquer Deploy**, ouvre la section **Environment Variables** et ajoute les variables ci-dessous. Le fichier **`.env.example`** dans le code liste exactement ces variables avec, pour chacune, **où trouver la valeur** :
 
    | Variable | Valeur |
    |---|---|
    | `VITE_SUPABASE_URL` | la *Project URL* (étape 2) |
    | `VITE_SUPABASE_ANON_KEY` | la clé *anon public* (étape 2) |
+   | `VITE_TELEGRAM_BOT_USERNAME` | le nom de ton bot **sans le @** (ex. `MonSuperBot`) |
    | `SUPABASE_URL` | la même *Project URL* |
    | `SUPABASE_SERVICE_ROLE_KEY` | la clé *service_role* (étape 2) |
    | `TELEGRAM_BOT_TOKEN` | le token du bot (étape 4) |
    | `TELEGRAM_WEBHOOK_SECRET` | ton secret inventé (étape 4) |
    | `PUBLIC_APP_URL` | **laisse vide pour l'instant** |
 
-   ⚠️ Les deux variables qui commencent par `VITE_` doivent être présentes **avant** ce premier déploiement (elles sont « gravées » dans le site au moment du build).
+   (Pour une instance **partagée** où plusieurs personnes créent leur propre compte, ajoute aussi `VITE_ALLOW_SIGNUP=true` — voir la section [Mode partagé](#mode-partagé-plusieurs-personnes-sur-une-instance) plus bas.)
+
+   ⚠️ Les variables qui commencent par `VITE_` doivent être présentes **avant** ce premier déploiement (elles sont « gravées » dans le site au moment du build).
 
 4. Clique **Deploy** et attends. À la fin, Vercel te donne l'adresse de ton app, du genre `https://crm-prospection-xxxx.vercel.app`. **Copie-la.**
 5. Retourne dans **Settings → Environment Variables**, renseigne `PUBLIC_APP_URL` avec cette adresse, **enregistre**, puis va dans l'onglet **Deployments** → sur le dernier déploiement, menu **⋯** → **Redeploy**. (C'est normal : l'adresse n'existe qu'après le 1er déploiement, d'où ce 2e tour.)
@@ -146,8 +152,8 @@ Cette étape « branche » ton bot à ton app (sinon le bot ne sait pas où envo
 
 1. Ouvre ton app (l'URL Vercel) et connecte-toi avec l'email/mot de passe de l'étape 3.
 2. Va dans **Paramètres → Prospection**.
-3. Sur Telegram, envoie **`/start`** à ton bot : il te répond avec ton **`chat_id`** (un nombre).
-4. Colle ce `chat_id` dans le champ **Chat ID Telegram**, règle tes **objectifs** et tes **délais de relance** (ou laisse les valeurs par défaut), puis **Enregistre**.
+3. Dans la carte **Telegram**, clique **« Connecter Telegram »** : Telegram s'ouvre sur ton bot → tape **Démarrer**. Reviens dans l'app, ça affiche **« ✓ Telegram connecté »** tout seul (pas de `chat_id` à copier).
+4. Règle tes **objectifs** et tes **délais de relance** (ou laisse les valeurs par défaut), puis **Enregistre**.
 
 🎉 C'est installé. Passe à la vérification.
 
@@ -160,7 +166,7 @@ Coche ces points :
 - [ ] Je me connecte → j'arrive sur le **Dashboard** (3 blocs : Relances du jour, Objectifs, Entonnoir).
 - [ ] Dans **CRM Pipeline**, je peux créer un contact à la main et le glisser d'une colonne à l'autre.
 - [ ] J'envoie une **URL LinkedIn/Instagram** à mon bot → il répond **`✅ … ajouté`** → le contact apparaît dans la colonne **À contacter**.
-- [ ] Je clique **« Voir la fiche »** dans le message Telegram → la fiche du contact s'ouvre dans l'app.
+- [ ] Dans **Paramètres → Telegram**, **« Connecter Telegram »** relie bien mon compte (affiche « ✓ Telegram connecté »).
 - [ ] Je renvoie **la même URL** → le bot répond **`⚠️ Déjà dans le CRM`** (anti-doublon).
 - [ ] Sur mon téléphone, l'app est lisible et il n'y a pas de scroll horizontal bizarre.
 
@@ -203,9 +209,30 @@ Dans **Paramètres → Prospection** :
 - **Délai relance #2+** : nombre de jours entre les relances suivantes.
 - **Cadence suivi conversation** : nombre de jours entre deux relances quand le prospect a répondu.
 - **Nombre max de relances** : après combien de relances on arrête (le contact part en « Fin de relance »).
-- **Chat ID Telegram** : pour autoriser ton compte Telegram à ajouter des prospects.
+- **Telegram** : le bouton **« Connecter Telegram »** relie ton compte au bot (1 tap, pas de copier-coller).
 
 Toutes les relances se déclenchent à **9h00 (heure de Paris)**.
+
+---
+
+## Mode partagé (plusieurs personnes sur une instance)
+
+Par défaut l'app est mono-utilisateur (tu crées le compte à la main dans Supabase). Tu peux aussi
+héberger **une seule instance pour plusieurs personnes** (ex. un groupe d'accompagnement) : chacun
+crée son compte et ne voit que ses propres prospects (isolation garantie par la sécurité RLS).
+
+Pour activer ce mode, **côté hôte** :
+1. **Vercel** : ajoute la variable `VITE_ALLOW_SIGNUP=true` puis redeploie → un bouton **« Créer un compte »** apparaît sur la page de connexion.
+2. **Supabase** → **Authentication** → **Sign In / Providers** (ou **Settings**) → **désactive « Confirm email »**. L'inscription devient instantanée, sans email de confirmation à gérer.
+3. Partage simplement l'**URL de l'app** à tes invités.
+
+Côté invité : ouvrir l'URL → **Créer un compte** → **Paramètres → Connecter Telegram** → taper *Démarrer*.
+Tout le monde partage le **même bot**, mais chacun a sa **conversation privée** : les prospects de
+chacun atterrissent dans son propre CRM.
+
+> ⚠️ Inscriptions ouvertes = n'importe qui avec l'URL peut créer un compte (et consomme ton quota
+> Supabase). Pour un petit groupe c'est OK ; sinon laisse `VITE_ALLOW_SIGNUP=false` et crée les
+> comptes à la main (étape 3).
 
 ---
 
@@ -218,7 +245,7 @@ Toutes les relances se déclenchent à **9h00 (heure de Paris)**.
 → Normalement géré par le fichier `vercel.json` (déjà inclus). Assure-toi qu'il est bien présent dans ton repo et redeploie.
 
 **Le bot répond « 🔒 Chat non autorisé »**
-→ Ton `chat_id` n'est pas (ou mal) enregistré dans **Paramètres → Prospection**. Renvoie `/start` au bot, recopie le nombre exact, enregistre.
+→ Ton compte n'est pas relié. Va dans **Paramètres → Telegram → Connecter Telegram**, et tape **Démarrer** dans Telegram. (Vérifie aussi que `VITE_TELEGRAM_BOT_USERNAME` est bien renseignée dans Vercel.)
 
 **Le bot ne répond pas du tout quand j'envoie une URL**
 → L'étape 6 (`npm run setup:telegram`) n'a pas été faite, ou `PUBLIC_APP_URL` est vide/incorrect dans Vercel. Vérifie `PUBLIC_APP_URL`, redeploie, puis relance `npm run setup:telegram`.
