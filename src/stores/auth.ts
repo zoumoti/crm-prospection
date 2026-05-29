@@ -9,6 +9,7 @@ interface AuthState {
   loading: boolean
   init: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signOut: () => Promise<void>
 }
 
@@ -39,6 +40,20 @@ export const useAuth = create<AuthState>((set) => ({
       loading: false,
     })
     return { error: error?.message ?? null }
+  },
+
+  signUp: async (email, password) => {
+    set({ loading: true })
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    set({
+      session: data.session,
+      user: data.user,
+      loading: false,
+    })
+    // When "Confirm email" is OFF in Supabase, signUp returns a session and the
+    // user is logged in immediately. When it's ON, session is null and they must
+    // confirm via email first.
+    return { error: error?.message ?? null, needsConfirmation: !error && !data.session }
   },
 
   signOut: async () => {

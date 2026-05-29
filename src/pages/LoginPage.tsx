@@ -10,14 +10,18 @@ import { Spinner } from '@/components/ui/Spinner'
 import { Logo } from '@/components/ui/Logo'
 import { APP_NAME } from '@/config/brand'
 
+const ALLOW_SIGNUP = import.meta.env.VITE_ALLOW_SIGNUP === 'true'
+
 export function LoginPage() {
-  const { session, signIn, loading, initialized } = useAuth()
+  const { session, signIn, signUp, loading, initialized } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
 
   if (!initialized) {
     return (
@@ -32,9 +36,34 @@ export function LoginPage() {
     return <Navigate to={from} replace />
   }
 
+  const isSignup = mode === 'signup'
+
+  function switchMode(next: 'signin' | 'signup') {
+    setMode(next)
+    setError(null)
+    setInfo(null)
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setInfo(null)
+
+    if (isSignup) {
+      const { error, needsConfirmation } = await signUp(email, password)
+      if (error) {
+        setError(error)
+        return
+      }
+      if (needsConfirmation) {
+        setInfo('Compte créé. Vérifie ta boîte mail pour confirmer, puis connecte-toi.')
+        setMode('signin')
+        return
+      }
+      navigate('/', { replace: true })
+      return
+    }
+
     const { error } = await signIn(email, password)
     if (error) {
       setError(error)
@@ -52,8 +81,12 @@ export function LoginPage() {
           <span className="font-semibold text-text text-lg">{APP_NAME}</span>
         </div>
 
-        <h1 className="text-2xl font-semibold text-text mb-1">Se connecter</h1>
-        <p className="text-sm text-muted mb-6">Accédez à votre espace de gestion.</p>
+        <h1 className="text-2xl font-semibold text-text mb-1">
+          {isSignup ? 'Créer un compte' : 'Se connecter'}
+        </h1>
+        <p className="text-sm text-muted mb-6">
+          {isSignup ? 'Crée ton espace de prospection.' : 'Accède à ton espace de prospection.'}
+        </p>
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
@@ -75,7 +108,7 @@ export function LoginPage() {
               <Input
                 id="password"
                 type={showPwd ? 'text' : 'password'}
-                autoComplete="current-password"
+                autoComplete={isSignup ? 'new-password' : 'current-password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -97,11 +130,44 @@ export function LoginPage() {
               {error}
             </div>
           )}
+          {info && (
+            <div className="text-sm text-success bg-success/10 rounded-lg px-3 py-2">
+              {info}
+            </div>
+          )}
 
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? <Spinner size="sm" /> : 'Se connecter'}
+            {loading ? <Spinner size="sm" /> : isSignup ? 'Créer mon compte' : 'Se connecter'}
           </Button>
         </form>
+
+        {ALLOW_SIGNUP && (
+          <div className="mt-4 text-center text-sm text-muted">
+            {isSignup ? (
+              <>
+                Déjà un compte ?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className="text-accent font-medium hover:underline"
+                >
+                  Se connecter
+                </button>
+              </>
+            ) : (
+              <>
+                Pas encore de compte ?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  className="text-accent font-medium hover:underline"
+                >
+                  Créer un compte
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   )
