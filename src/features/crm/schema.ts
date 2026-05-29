@@ -100,15 +100,6 @@ export const prospectionSettingsSchema = z.object({
   followup_2_days:            z.coerce.number().int().min(1).max(365),
   conversation_followup_days: z.coerce.number().int().min(1).max(365),
   max_followups:              z.coerce.number().int().min(1).max(10),
-  telegram_chat_id: z
-    .string()
-    .trim()
-    .refine(
-      (v) => v === '' || /^-?\d+$/.test(v),
-      'chat_id invalide (chiffres uniquement, négatif autorisé pour les groupes)',
-    )
-    .transform((v) => (v === '' ? null : v))
-    .nullable(),
 })
 export type ProspectionSettingsFormValues = z.input<typeof prospectionSettingsSchema>
 export type ProspectionSettingsFormOutput = z.output<typeof prospectionSettingsSchema>
@@ -120,5 +111,4 @@ export const emptyProspectionSettingsForm: ProspectionSettingsFormValues = {
   followup_2_days: 7,
   conversation_followup_days: 2,
   max_followups: 3,
-  telegram_chat_id: '',
 }

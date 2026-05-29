@@ -114,6 +114,7 @@ create table prospection_settings (
   conversation_followup_days   int  not null default 2,
   max_followups                int  not null default 3,
   telegram_chat_id             text,
+  telegram_link_code           text,
   updated_at                   timestamptz not null default now(),
 
   constraint prospection_settings_positive_delays
@@ -124,6 +125,10 @@ create table prospection_settings (
 create unique index prospection_settings_telegram_chat_id_uniq
   on prospection_settings (telegram_chat_id)
   where telegram_chat_id is not null;
+
+create unique index prospection_settings_telegram_link_code_uniq
+  on prospection_settings (telegram_link_code)
+  where telegram_link_code is not null;
 
 create trigger trg_prospection_settings_updated_at
   before update on prospection_settings

@@ -44,8 +44,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const chatId = String(message.chat.id)
   const text = message.text.trim()
 
-  // 3. /start always allowed — bootstrap
-  if (text === '/start') return handleStart(chatId, res)
+  // 3. /start always allowed — bootstrap / deep-link linking (/start <code>)
+  if (text === '/start' || text.startsWith('/start ')) {
+    const payload = text.slice('/start'.length).trim()
+    return handleStart(chatId, payload, res)
+  }
 
   // 4. Chat allowlist
   const user = await findUserByTelegramChatId(chatId)
@@ -68,12 +71,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
 // ---------- handlers ----------
 
-async function handleStart(chatId: string, res: VercelResponse): Promise<void> {
+async function handleStart(chatId: string, payload: string, res: VercelResponse): Promise<void> {
+  // Deep-link linking: the app opened t.me/<bot>?start=<code>. Bind this chat
+  // to the account that generated <code>, then consume the code (one-time).
+  if (payload) {
+    const { data, error } = await supabaseAdmin()
+      .from('prospection_settings')
+      .update({ telegram_chat_id: chatId, telegram_link_code: null })
+      .eq('telegram_link_code', payload)
+      .select('user_id')
+      .maybeSingle()
+    if (!error && data) {
+      await sendMessage(chatId,
+        `✅ <b>Telegram connecté !</b>\n\n` +
+        `<i>C'est bon, reviens dans l'app. Envoie-moi une URL LinkedIn, Instagram, TikTok ou X quand tu veux : je l'ajoute direct à ton CRM.</i>`,
+      )
+      res.status(200).send('ok')
+      return
+    }
+    await sendMessage(chatId,
+      `❌ <b>Lien invalide ou expiré</b>\n\n` +
+      `<i>Retourne dans l'app → Paramètres → clique « Connecter Telegram » pour générer un nouveau lien.</i>`,
+    )
+    res.status(200).send('ok')
+    return
+  }
+
   await sendMessage(chatId,
     `👋 <b>Salut !</b>\n\n` +
-    `Ton <code>chat_id</code> : <code>${chatId}</code>\n\n` +
-    `Colle-le dans <b>Paramètres → Prospection → Telegram</b> pour activer l'ajout de prospects.\n\n` +
-    `<i>Une fois configuré, envoie-moi une URL LinkedIn, Instagram, TikTok ou X : je l'ajoute direct au CRM.</i>`,
+    `Pour relier ton compte, va dans l'app → <b>Paramètres → Connecter Telegram</b>. Ça ouvrira cette conversation avec un lien.\n\n` +
+    `<i>Une fois relié, envoie-moi une URL LinkedIn, Instagram, TikTok ou X : je l'ajoute direct à ton CRM.</i>`,
   )
   res.status(200).send('ok')
 }

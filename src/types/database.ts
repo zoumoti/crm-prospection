@@ -348,6 +348,7 @@ export type ProspectionSettings = {
   conversation_followup_days: number
   max_followups: number
   telegram_chat_id: string | null
+  telegram_link_code: string | null
   daily_recap_enabled: boolean
   daily_recap_hour: number
   updated_at: string

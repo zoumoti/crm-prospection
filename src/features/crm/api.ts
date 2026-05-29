@@ -362,6 +362,33 @@ export async function upsertProspectionSettings(
   return data
 }
 
+/**
+ * Store a one-time code on the current user's settings row, used by the
+ * Telegram deep link (t.me/<bot>?start=<code>). The bot's /start handler binds
+ * the chat to this account and consumes the code.
+ */
+export async function setTelegramLinkCode(code: string): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const user = userData.user
+  if (!user) throw new Error('Non authentifié')
+  const { error } = await supabase
+    .from('prospection_settings')
+    .upsert({ user_id: user.id, telegram_link_code: code })
+  if (error) throw error
+}
+
+/** Unlink Telegram for the current user (clears chat id + any pending code). */
+export async function disconnectTelegram(): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser()
+  const user = userData.user
+  if (!user) throw new Error('Non authentifié')
+  const { error } = await supabase
+    .from('prospection_settings')
+    .update({ telegram_chat_id: null, telegram_link_code: null })
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
 // =====================================================================
 // Weekly activity aggregation (Dashboard CrmGoalsWidget)
 // =====================================================================

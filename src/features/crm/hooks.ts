@@ -209,6 +209,9 @@ export function useProspectionSettings() {
   return useQuery({
     queryKey: SETTINGS_KEY,
     queryFn: api.getProspectionSettings,
+    // Refetch when the user returns to the tab (e.g. back from Telegram after
+    // tapping "Démarrer") so the "connected" state updates on its own.
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -217,6 +220,22 @@ export function useUpsertProspectionSettings() {
   return useMutation({
     mutationFn: (input: Omit<ProspectionSettingsUpsert, 'user_id'>) =>
       api.upsertProspectionSettings(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SETTINGS_KEY }),
+  })
+}
+
+export function useSetTelegramLinkCode() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (code: string) => api.setTelegramLinkCode(code),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SETTINGS_KEY }),
+  })
+}
+
+export function useDisconnectTelegram() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.disconnectTelegram(),
     onSuccess: () => qc.invalidateQueries({ queryKey: SETTINGS_KEY }),
   })
 }

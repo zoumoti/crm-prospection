@@ -13,7 +13,12 @@ import {
   type ProspectionSettingsFormValues,
   type ProspectionSettingsFormOutput,
 } from '@/features/crm/schema'
-import { useProspectionSettings, useUpsertProspectionSettings } from '@/features/crm/hooks'
+import {
+  useProspectionSettings,
+  useUpsertProspectionSettings,
+  useSetTelegramLinkCode,
+  useDisconnectTelegram,
+} from '@/features/crm/hooks'
 import type { ProspectionSettings } from '@/types/database'
 
 function toFormValues(s: ProspectionSettings | null | undefined): ProspectionSettingsFormValues {
@@ -25,7 +30,6 @@ function toFormValues(s: ProspectionSettings | null | undefined): ProspectionSet
     followup_2_days: s.followup_2_days,
     conversation_followup_days: s.conversation_followup_days,
     max_followups: s.max_followups,
-    telegram_chat_id: s.telegram_chat_id ?? '',
   }
 }
 
@@ -71,79 +75,143 @@ export function ProspectionSettingsCard() {
   }
 
   return (
+    <>
+      <Card className="p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold mb-1">Prospection</h2>
+        <p className="text-sm text-muted mb-4">
+          Objectifs hebdomadaires et délais des relances. Les délais s'appliquent à 9h00 (Europe/Paris).
+        </p>
+
+        <form onSubmit={handleSubmit(onValid)} className="space-y-5" noValidate>
+          {submitError && (
+            <div className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2" role="alert">{submitError}</div>
+          )}
+
+          <Section title="Objectifs hebdo">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FieldWrapper label="Messages / semaine" error={errors.weekly_message_goal?.message}>
+                <Input type="number" inputMode="numeric" min={0} max={10000}
+                       {...register('weekly_message_goal')} />
+              </FieldWrapper>
+              <FieldWrapper label="Appels / semaine" error={errors.weekly_call_goal?.message}>
+                <Input type="number" inputMode="numeric" min={0} max={10000}
+                       {...register('weekly_call_goal')} />
+              </FieldWrapper>
+            </div>
+          </Section>
+
+          <Section title="Délais relances">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FieldWrapper label="Délai relance #1 (jours)" error={errors.followup_1_days?.message}>
+                <Input type="number" inputMode="numeric" min={1} max={365}
+                       {...register('followup_1_days')} />
+              </FieldWrapper>
+              <FieldWrapper label="Délai relance #2+ (jours)" error={errors.followup_2_days?.message}>
+                <Input type="number" inputMode="numeric" min={1} max={365}
+                       {...register('followup_2_days')} />
+              </FieldWrapper>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FieldWrapper label='Cadence suivi conversation (jours)'
+                            error={errors.conversation_followup_days?.message}>
+                <Input type="number" inputMode="numeric" min={1} max={365}
+                       {...register('conversation_followup_days')} />
+              </FieldWrapper>
+              <FieldWrapper label="Nombre max de relances avant abandon"
+                            error={errors.max_followups?.message}>
+                <Input type="number" inputMode="numeric" min={1} max={10}
+                       {...register('max_followups')} />
+              </FieldWrapper>
+            </div>
+          </Section>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {savedAt && Date.now() - savedAt < 5000 && (
+              <span className="text-xs text-success">✓ Enregistré</span>
+            )}
+            <Button type="submit" disabled={upsertMutation.isPending} className="ml-auto">
+              {upsertMutation.isPending ? <Spinner size="sm" /> : 'Enregistrer'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <TelegramCard connected={!!settings?.telegram_chat_id} />
+    </>
+  )
+}
+
+function TelegramCard({ connected }: { connected: boolean }) {
+  const setLinkCode = useSetTelegramLinkCode()
+  const disconnect = useDisconnectTelegram()
+  const [error, setError] = useState<string | null>(null)
+  const [opened, setOpened] = useState(false)
+
+  const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined
+
+  async function handleConnect() {
+    setError(null)
+    if (!botUsername) {
+      setError("Bot Telegram non configuré (variable VITE_TELEGRAM_BOT_USERNAME manquante).")
+      return
+    }
+    try {
+      const code = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+      await setLinkCode.mutateAsync(code)
+      const handle = botUsername.replace(/^@/, '')
+      window.open(`https://t.me/${handle}?start=${code}`, '_blank')
+      setOpened(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue.')
+    }
+  }
+
+  async function handleDisconnect() {
+    setError(null)
+    try {
+      await disconnect.mutateAsync()
+      setOpened(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue.')
+    }
+  }
+
+  return (
     <Card className="p-4 sm:p-6">
-      <h2 className="text-base sm:text-lg font-semibold mb-1">Prospection</h2>
+      <h2 className="text-base sm:text-lg font-semibold mb-1">Telegram</h2>
       <p className="text-sm text-muted mb-4">
-        Objectifs hebdomadaires et délais des relances. Les délais s'appliquent à 9h00 (Europe/Paris).
+        Une fois connecté, envoie une URL de profil (LinkedIn, Instagram, TikTok, X) à ton bot
+        depuis ton téléphone et le contact se crée tout seul dans ton CRM.
       </p>
 
-      <form onSubmit={handleSubmit(onValid)} className="space-y-5" noValidate>
-        {submitError && (
-          <div className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2" role="alert">{submitError}</div>
-        )}
+      {error && (
+        <div className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2 mb-3" role="alert">{error}</div>
+      )}
 
-        <Section title="Objectifs hebdo">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldWrapper label="Messages / semaine" error={errors.weekly_message_goal?.message}>
-              <Input type="number" inputMode="numeric" min={0} max={10000}
-                     {...register('weekly_message_goal')} />
-            </FieldWrapper>
-            <FieldWrapper label="Appels / semaine" error={errors.weekly_call_goal?.message}>
-              <Input type="number" inputMode="numeric" min={0} max={10000}
-                     {...register('weekly_call_goal')} />
-            </FieldWrapper>
-          </div>
-        </Section>
-
-        <Section title="Délais relances">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldWrapper label="Délai relance #1 (jours)" error={errors.followup_1_days?.message}>
-              <Input type="number" inputMode="numeric" min={1} max={365}
-                     {...register('followup_1_days')} />
-            </FieldWrapper>
-            <FieldWrapper label="Délai relance #2+ (jours)" error={errors.followup_2_days?.message}>
-              <Input type="number" inputMode="numeric" min={1} max={365}
-                     {...register('followup_2_days')} />
-            </FieldWrapper>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldWrapper label='Cadence suivi conversation (jours)'
-                          error={errors.conversation_followup_days?.message}>
-              <Input type="number" inputMode="numeric" min={1} max={365}
-                     {...register('conversation_followup_days')} />
-            </FieldWrapper>
-            <FieldWrapper label="Nombre max de relances avant abandon"
-                          error={errors.max_followups?.message}>
-              <Input type="number" inputMode="numeric" min={1} max={10}
-                     {...register('max_followups')} />
-            </FieldWrapper>
-          </div>
-        </Section>
-
-        <Section title="Telegram">
-          <p className="text-xs text-muted -mt-1 mb-1">
-            Pour ajouter des prospects depuis ton téléphone : ouvre Telegram,
-            envoie <code>/start</code> à ton bot, et colle ici le <code>chat_id</code> qu'il te renvoie.
-          </p>
-          <FieldWrapper label="Chat ID Telegram" error={errors.telegram_chat_id?.message}>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="ex. 123456789"
-              {...register('telegram_chat_id')}
-            />
-          </FieldWrapper>
-        </Section>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {savedAt && Date.now() - savedAt < 5000 && (
-            <span className="text-xs text-success">✓ Enregistré</span>
-          )}
-          <Button type="submit" disabled={upsertMutation.isPending} className="ml-auto">
-            {upsertMutation.isPending ? <Spinner size="sm" /> : 'Enregistrer'}
+      {connected ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-success font-medium">✓ Telegram connecté</span>
+          <Button
+            variant="ghost"
+            onClick={handleDisconnect}
+            disabled={disconnect.isPending}
+            className="text-danger hover:bg-danger/10"
+          >
+            {disconnect.isPending ? <Spinner size="sm" /> : 'Déconnecter'}
           </Button>
         </div>
-      </form>
+      ) : (
+        <div className="space-y-2">
+          <Button onClick={handleConnect} disabled={setLinkCode.isPending}>
+            {setLinkCode.isPending ? <Spinner size="sm" /> : 'Connecter Telegram'}
+          </Button>
+          {opened && (
+            <p className="text-xs text-muted">
+              Telegram s'est ouvert → tape <b>Démarrer</b>, puis reviens ici : l'état se met à jour tout seul.
+            </p>
+          )}
+        </div>
+      )}
     </Card>
   )
 }
